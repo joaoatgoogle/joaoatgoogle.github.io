@@ -1,0 +1,48 @@
+<html>
+  <head>
+<style>
+
+body {
+  margin: 0;
+  font-family: sans-serif;
+}
+
+#canvas {
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+}
+
+#text {
+  position: absolute;
+}
+
+#restart {
+  padding: 8px 12px;
+  border-radius: 8px;
+  position: absolute;
+  background-color: #448AFF;
+  color: white;
+  user-select: none;
+  pointer: cursor;
+}
+
+#restart:hover {
+  background-color: #2979FF;
+}
+
+#restart:active {
+  background-color: #2962FF;
+}
+
+</style>
+  </head>
+
+  <body>
+    <canvas id="canvas"></canvas>
+    <div id="text"></div>
+    <div id="restart">Restart</div>
+  </body>
+
+  <script src="script.js"></script>
+</html>
