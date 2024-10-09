@@ -261,7 +261,33 @@ function onClick(event) {
 }
 
 function sendInit() {
-  sendMessage({type: 'init', supportsScreenshot: true});
+  sendMessage({
+    type: 'init',
+    supportsScreenshot: true,
+    functionDeclarations: [
+      {
+        'name': 'play',
+        'description': 'Places the next X or O in a game of Tic Tac Toe. The first to play is always X. The cells are identified by row and column numbers, from 1 to 3.',
+        'parameters': {
+          'type': 'object',
+          'properties': {
+            'row': {
+              'type': 'integer',
+              'description': 'The row of the cell to make a move on. Valid values: 1, 2 or 3',
+              'minimum': 1,
+              'maximum': 3,
+            },
+            'column': {
+              'type': 'integer',
+              'description': 'The column of the cell to make a move on. Valid values: 1, 2 or 3',
+              'minimum': 1,
+              'maximum': 3,
+            },
+          },
+        },
+      },
+    ],
+  });
 }
 
 function sendScreenshot() {
