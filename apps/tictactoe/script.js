@@ -46,6 +46,8 @@ const WIN_POSITIONS = [
 
 let winPosition = undefined;
 
+let aistudioOrigin = '';
+
 function onRestart() {
   setText(X_TO_PLAY);
   gridState.fill('');
@@ -258,9 +260,39 @@ function onClick(event) {
   }
 }
 
+function sendInit() {
+  sendMessage({type: 'init', supportsScreenshot: true});
+}
+
+function sendScreenshot() {
+  canvasElement.toBlob((blob) => sendMessage({type: 'screenshot', blob}));
+}
+
+function sendMessage(message) {
+  window.parent.postMessage(message, aistudioOrigin);
+}
+
+function onMessage(event) {
+  const data = event.data;
+
+  switch (data.type) {
+
+    case 'init':
+      aistudioOrigin = event.origin;
+      sendInit();
+      break;
+
+    case 'screenshot':
+      sendScreenshot();
+      break;
+
+  }
+}
+
 function init() {
   window.addEventListener('resize', onResize);
   window.addEventListener('click', onClick);
+  window.addEventListener('message', onMessage);
   restartElement.addEventListener('click', onRestart);
   onRestart();
   onResize();
