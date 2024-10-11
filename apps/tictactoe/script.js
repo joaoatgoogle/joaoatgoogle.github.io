@@ -264,6 +264,7 @@ function sendInit() {
   sendMessage({
     type: 'init',
     supportsScreenshot: true,
+    systemInstructions: 'You are a passionate gamer and love puzzles. Give playful answers. When playing a game, analyze it carefully and make the best plays to win.',
     functionDeclarations: [
       {
         'name': 'play',
