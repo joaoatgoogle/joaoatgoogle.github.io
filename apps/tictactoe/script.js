@@ -1,8 +1,6 @@
+const canvasContainerElement = document.getElementById('canvasContainer');
 const canvasElement = document.getElementById('canvas');
 const canvas = canvasElement.getContext('2d');
-
-const textElement = document.getElementById('text');
-const restartElement = document.getElementById('restart');
 
 const gridState = ['', '', '', '', '', '', '', '', ''];
 
@@ -23,15 +21,6 @@ let gameState = X_TURN;
 
 let emptyPositions = 9;
 
-const X = '<span style="color: #448AFF; font-weight: bold">x</span>';
-const O = '<span style="color: #FF5252; font-weight: bold">o</span>';
-const X_TO_PLAY = `Next turn: ${X}`;
-const O_TO_PLAY = `Next turn: ${O}`;
-const X_WIN = `${X} wins!`;
-const O_WIN = `${O} wins!`;
-const DRAW = `It's a draw!`;
-const INVALID_MOVE = '<span style="color: #FF5252; font-weight: bold">Invalid move!</span>';
-
 const WIN_POSITIONS = [
   [[0, 0], [0, 1], [0, 2]],
   [[1, 0], [1, 1], [1, 2]],
@@ -49,13 +38,29 @@ let winPosition = undefined;
 
 let aistudioOrigin = '';
 
+let autoplay = false;
+
 function onRestart() {
-  setText(X_TO_PLAY);
   gridState.fill('');
   gameState = X_TURN;
   emptyPositions = 9;
   winPosition = undefined;
   requestDraw(draw);
+}
+
+function onPlayGemini() {
+  if (gameState !== X_TURN && gameState !== O_TURN) {
+    return;
+  }
+  const next = gameState === X_TURN ? 'X' : 'O';
+  const userText = `Play the next turn as ${next}`;
+  const includeScreenshot = true;
+  sendMessage({type: 'sendToModel', userText, includeScreenshot});
+}
+
+function onAutoplay() {
+  autoplay = !autoplay;
+  sendText(`Autoplay is now ${autoplay ? 'enabled' : 'disabled'}.`);
 }
 
 function isWinPosition([[r1, c1], [r2, c2], [r3, c3]], player) {
@@ -70,10 +75,6 @@ function getWinPosition(player) {
 
 function isInCurrentWinPosition(row, column) {
   return winPosition && winPosition.some(([r, c]) => r === row && c === column);
-}
-
-function setText(text) {
-  textElement.innerHTML = text;
 }
 
 function drawCross(x, y, size) {
@@ -129,20 +130,18 @@ function draw() {
   const smallest = Math.min(width, height);
 
   // "size" is the size of the grid.
-  // We take the "smallest" dimension of the viewport and split it into 18
+  // We take the "smallest" dimension of the viewport and split it into 16.
   // parts. Each inner square takes 4 parts (12 total), and each line around
-  // that takes 1 part (4 total), plus 2 parts on the sides for padding.
-  // We also add an extra level of padding at the bottom, to show the game
-  // state.
-  const size = (16 / 20) * smallest;
-  const thickness = (1 / 20) * smallest;
+  // that takes 1 part (4 total).
+  const gridSize = smallest;
+  const thickness = (1 / 16) * smallest;
 
-  const offx = (width - size) / 2;
-  const offy = (height - size) / 2 - thickness;
+  const offx = (width - smallest) / 2;
+  const offy = (height - smallest) / 2;
 
   canvas.fillStyle = '#ccc';
   canvas.beginPath();
-  canvas.roundRect(offx, offy, size, size, thickness);
+  canvas.roundRect(offx, offy, gridSize, gridSize, thickness);
   canvas.closePath();
   canvas.fill();
 
@@ -188,21 +187,8 @@ function draw() {
     }
   }
 
-  let fontHeight = Math.floor(thickness);
-  const textTop = Math.floor(offy + size + fontHeight - thickness / 2);
-  const textLeft = Math.floor(offx + thickness);
-  const textRight = Math.floor(width - (offx + size - thickness));
-
-  textElement.style.fontSize = `${fontHeight}px`;
-  textElement.style.top = `${textTop}px`;
-  textElement.style.left = `${textLeft}px`;
-
-  fontHeight = Math.floor(fontHeight * 0.8);
-  const padding = Math.floor(fontHeight * 0.2);
-  restartElement.style.fontSize = `${fontHeight}px`;
-  restartElement.style.padding = `${padding}px ${padding * 2}px`;
-  restartElement.style.top = `${textTop}px`;
-  restartElement.style.right = `${textRight}px`;
+  let fontHeight = Math.max(10, Math.floor(thickness / 3));
+  document.body.style.fontSize = `${fontHeight}px`;
 }
 
 function requestDraw() {
@@ -210,8 +196,12 @@ function requestDraw() {
 }
 
 function onResize() {
-  canvasElement.width = window.innerWidth;
-  canvasElement.height = window.innerHeight;
+  const rect = canvasContainerElement.getBoundingClientRect();
+  const size = Math.min(rect.width, rect.height);
+  canvasElement.style.width = `${size}px`;
+  canvasElement.style.height = `${size}px`;
+  canvasElement.width = size * devicePixelRatio;
+  canvasElement.height = size * devicePixelRatio;
   requestDraw();
 }
 
@@ -231,18 +221,22 @@ function play(row, column) {
     gridState[index] = 'x';
     winPosition = getWinPosition('x');
     gameState = winPosition ? OVER : O_TURN;
-    setText(winPosition ? X_WIN : O_TO_PLAY);
+    if (winPosition) {
+      sendText('X wins!');
+    }
   } else {
     gridState[index] = 'o';
     winPosition = getWinPosition('o');
     gameState = winPosition ? OVER : X_TURN;
-    setText(winPosition ? O_WIN : X_TO_PLAY);
+    if (winPosition) {
+      sendText('O wins!');
+    }
   }
 
   emptyPositions--;
   if (emptyPositions === 0 && gameState !== OVER) {
     gameState == OVER;
-    setText(DRAW);
+    sendText(`It's a draw!`);
   }
 
   requestDraw();
@@ -255,8 +249,8 @@ function onClick(event) {
     return;
   }
 
-  const x = event.x;
-  const y = event.y;
+  const x = event.offsetX * devicePixelRatio;
+  const y = event.offsetY * devicePixelRatio;
 
   for (let row = 0; row < 3; row++) {
     for (let column = 0; column < 3; column++) {
@@ -265,6 +259,12 @@ function onClick(event) {
       if (x >= cx && x <= cx + size && y >= cy && y <= cy + size) {
         // Clicking inside this grid position.
         play(row, column);
+
+        // Make an autoplay if enabled and there are positions left.
+        if (autoplay && (gameState === X_TURN || gameState == O_TURN)) {
+          onPlayGemini();
+        }
+
         return;
       }
     }
@@ -302,6 +302,10 @@ function sendInit() {
   });
 }
 
+function sendText(text) {
+  sendMessage({type: 'chat', text});
+}
+
 function sendScreenshot() {
   canvasElement.toBlob((blob) => sendMessage({type: 'screenshot', blob}));
 }
@@ -313,7 +317,7 @@ function sendMessage(message) {
 function handlePlay(row, column) {
   const valid = play(row - 1, column - 1);
   if (!valid) {
-    setText(INVALID_MOVE);
+    sendText('Invalid move!');
   }
 }
 
@@ -333,6 +337,7 @@ function onMessage(event) {
     case 'init':
       aistudioOrigin = event.origin;
       sendInit();
+      sendText('Welcome to Tic Tac Toe!');
       break;
 
     case 'screenshot':
@@ -348,12 +353,16 @@ function onMessage(event) {
 
 function init() {
   window.addEventListener('resize', onResize);
-  window.addEventListener('click', onClick);
+  canvasElement.addEventListener('click', onClick);
   window.addEventListener('message', onMessage);
-  restartElement.addEventListener('click', onRestart);
+
+  document.getElementById('play').addEventListener('click', onPlayGemini);
+  document.getElementById('autoplay').addEventListener('click', onAutoplay);
+  document.getElementById('restart').addEventListener('click', onRestart);
+
   onRestart();
   onResize();
-  draw();
+  requestAnimationFrame(onResize);
 }
 
 init();

@@ -4,27 +4,65 @@
 
 body {
   margin: 0;
+  padding: 24px;
   font-family: sans-serif;
-}
-
-#canvas {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
   width: 100vw;
   height: 100vh;
-  position: absolute;
+  box-sizing: border-box;
 }
 
-#text {
-  position: absolute;
+#canvasContainer {
+  display: flex;
+  justify-content: center;
+  aspect-ratio: 1;
+  max-width: 100%;
+  max-height: 80%;
+}
+
+#buttons {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 24px;
+}
+
+.button {
+  padding: 12px 16px;
+  border-radius: 8px;
+  color: white;
+  user-select: none;
+}
+
+#play {
+  background-color: #448AFF;
+}
+
+#play:hover {
+  background-color: #2979FF;
+}
+
+#play:active {
+  background-color: #2962FF;
+}
+
+#autoplay {
+  background-color: #448AFF;
+}
+
+#autoplay:hover {
+  background-color: #2979FF;
+}
+
+#autoplay:active {
+  background-color: #2962FF;
 }
 
 #restart {
-  padding: 8px 12px;
-  border-radius: 8px;
-  position: absolute;
   background-color: #448AFF;
-  color: white;
-  user-select: none;
-  pointer: cursor;
 }
 
 #restart:hover {
@@ -39,9 +77,14 @@ body {
   </head>
 
   <body>
-    <canvas id="canvas"></canvas>
-    <div id="text"></div>
-    <div id="restart">Restart</div>
+    <div id="canvasContainer">
+      <canvas id="canvas"></canvas>
+    </div>
+    <div id="buttons">
+      <div id="play" class="button">Ask Gemini to Play</div>
+      <div id="autoplay" class="button">Autoplay</div>
+      <div id="restart" class="button">Restart</div>
+    </div>
   </body>
 
   <script src="script.js"></script>
