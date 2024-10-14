@@ -30,6 +30,7 @@ const O_TO_PLAY = `Next turn: ${O}`;
 const X_WIN = `${X} wins!`;
 const O_WIN = `${O} wins!`;
 const DRAW = `It's a draw!`;
+const INVALID_MOVE = '<span style="color: #FF5252; font-weight: bold">Invalid move!</span>';
 
 const WIN_POSITIONS = [
   [[0, 0], [0, 1], [0, 2]],
@@ -67,8 +68,8 @@ function getWinPosition(player) {
   return WIN_POSITIONS.find(p => isWinPosition(p, player));
 }
 
-function isInCurrentWinPosition(row, col) {
-  return winPosition && winPosition.some(([r, c]) => r === row && c === col);
+function isInCurrentWinPosition(row, column) {
+  return winPosition && winPosition.some(([r, c]) => r === row && c === column);
 }
 
 function setText(text) {
@@ -146,17 +147,17 @@ function draw() {
   canvas.fill();
 
   for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 3; col++) {
-      const x = offx + thickness + col * 5 * thickness;
+    for (let column = 0; column < 3; column++) {
+      const x = offx + thickness + column * 5 * thickness;
       const y = offy + thickness + row * 5 * thickness;
       const size = 4 * thickness;
       const radius = thickness / 2;
 
-      gridCoordinates[row * 3 + col][0] = x;
-      gridCoordinates[row * 3 + col][1] = y;
-      gridCoordinates[row * 3 + col][2] = size;
+      gridCoordinates[row * 3 + column][0] = x;
+      gridCoordinates[row * 3 + column][1] = y;
+      gridCoordinates[row * 3 + column][2] = size;
 
-      if (isInCurrentWinPosition(row, col)) {
+      if (isInCurrentWinPosition(row, column)) {
         canvas.globalCompositeOperation = 'source-over';
         // Material Amber 200
         canvas.fillStyle = '#FFE082';
@@ -174,14 +175,14 @@ function draw() {
   canvas.globalCompositeOperation = 'source-over';
 
   for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 3; col++) {
-      const state = gridState[row * 3 + col];
-      const x = offx + thickness + col * 5 * thickness + 2 * thickness;
+    for (let column = 0; column < 3; column++) {
+      const state = gridState[row * 3 + column];
+      const x = offx + thickness + column * 5 * thickness + 2 * thickness;
       const y = offy + thickness + row * 5 * thickness + 2 * thickness;
       if (state === 'x') {
         drawCross(x, y, 3 * thickness);
       } else if (state === 'o') {
-        const highlightBackground = isInCurrentWinPosition(row, col);
+        const highlightBackground = isInCurrentWinPosition(row, column);
         drawCircle(x, y, 3 * thickness, highlightBackground);
       }
     }
@@ -214,6 +215,41 @@ function onResize() {
   requestDraw();
 }
 
+function play(row, column) {
+  if (row < 0 || row > 2 || column < 0 || column > 2) {
+    return false;
+  }
+
+  const index = row * 3 + column;
+
+  if (gridState[index] !== '') {
+    // This position is already taken.
+    return false;
+  }
+
+  if (gameState === X_TURN) {
+    gridState[index] = 'x';
+    winPosition = getWinPosition('x');
+    gameState = winPosition ? OVER : O_TURN;
+    setText(winPosition ? X_WIN : O_TO_PLAY);
+  } else {
+    gridState[index] = 'o';
+    winPosition = getWinPosition('o');
+    gameState = winPosition ? OVER : X_TURN;
+    setText(winPosition ? O_WIN : X_TO_PLAY);
+  }
+
+  emptyPositions--;
+  if (emptyPositions === 0 && gameState !== OVER) {
+    gameState == OVER;
+    setText(DRAW);
+  }
+
+  requestDraw();
+
+  return true;
+}
+
 function onClick(event) {
   if (gameState !== X_TURN && gameState !== O_TURN) {
     return;
@@ -223,37 +259,12 @@ function onClick(event) {
   const y = event.y;
 
   for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 3; col++) {
-      const index = row * 3 + col;
+    for (let column = 0; column < 3; column++) {
+      const index = row * 3 + column;
       const [cx, cy, size] = gridCoordinates[index];
-
       if (x >= cx && x <= cx + size && y >= cy && y <= cy + size) {
         // Clicking inside this grid position.
-
-        if (gridState[index] === '') {
-          // Nothing there yet -- take a turn now.
-
-          if (gameState === X_TURN) {
-            gridState[index] = 'x';
-            winPosition = getWinPosition('x');
-            gameState = winPosition ? OVER : O_TURN;
-            setText(winPosition ? X_WIN : O_TO_PLAY);
-          } else {
-            gridState[index] = 'o';
-            winPosition = getWinPosition('o');
-            gameState = winPosition ? OVER : X_TURN;
-            setText(winPosition ? O_WIN : X_TO_PLAY);
-          }
-
-          emptyPositions--;
-          if (emptyPositions === 0 && gameState !== OVER) {
-            gameState == OVER;
-            setText(DRAW);
-          }
-
-          requestDraw();
-        }
-
+        play(row, column);
         return;
       }
     }
@@ -299,6 +310,21 @@ function sendMessage(message) {
   window.parent.postMessage(message, aistudioOrigin);
 }
 
+function handlePlay(row, column) {
+  const valid = play(row - 1, column - 1);
+  if (!valid) {
+    setText(INVALID_MOVE);
+  }
+}
+
+function handleFunctionCall(name, args) {
+  switch (name) {
+    case 'play':
+      handlePlay(args.row, args.column);
+      break;
+  }
+}
+
 function onMessage(event) {
   const data = event.data;
 
@@ -311,6 +337,10 @@ function onMessage(event) {
 
     case 'screenshot':
       sendScreenshot();
+      break;
+
+    case 'functionCall':
+      handleFunctionCall(data.name, data.args);
       break;
 
   }
