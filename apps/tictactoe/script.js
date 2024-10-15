@@ -186,9 +186,6 @@ function draw() {
       }
     }
   }
-
-  let fontHeight = Math.max(10, Math.floor(thickness / 3));
-  document.body.style.fontSize = `${fontHeight}px`;
 }
 
 function requestDraw() {
@@ -197,7 +194,7 @@ function requestDraw() {
 
 function onResize() {
   const rect = canvasContainerElement.getBoundingClientRect();
-  const size = Math.min(rect.width, rect.height);
+  const size = Math.min(rect.width, rect.height, 512);
   canvasElement.style.width = `${size}px`;
   canvasElement.style.height = `${size}px`;
   canvasElement.width = size * devicePixelRatio;
@@ -307,7 +304,10 @@ function sendText(text) {
 }
 
 function sendScreenshot() {
-  canvasElement.toBlob((blob) => sendMessage({type: 'screenshot', blob}));
+  // Calling toBlob inside a RAF callback is significantly faster.
+  requestAnimationFrame(() => {
+    canvasElement.toBlob((blob) => sendMessage({type: 'screenshot', blob}));
+  });
 }
 
 function sendMessage(message) {
