@@ -54,8 +54,8 @@ function onPlayGemini() {
   }
   const next = gameState === X_TURN ? 'X' : 'O';
   const userText = `Play the next turn as ${next}`;
-  const includeScreenshot = true;
-  sendMessage({type: 'sendToModel', userText, includeScreenshot});
+  const imageDataURL = canvasElement.toDataURL();
+  sendMessage({type: 'sendToModel', userText, imageDataURL});
 }
 
 function onAutoplay() {
@@ -259,7 +259,9 @@ function onClick(event) {
 
         // Make an autoplay if enabled and there are positions left.
         if (autoplay && (gameState === X_TURN || gameState == O_TURN)) {
-          onPlayGemini();
+          // Wait for requestAnimationFrame() so that the screenshot includes
+          // changes from the play() above.
+          requestAnimationFrame(onPlayGemini);
         }
 
         return;
