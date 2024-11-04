@@ -304,10 +304,8 @@ function sendText(text) {
 }
 
 function sendScreenshot() {
-  // Calling toBlob inside a RAF callback is significantly faster.
-  requestAnimationFrame(() => {
-    canvasElement.toBlob((blob) => sendMessage({type: 'screenshot', blob}));
-  });
+  const dataURL = canvasElement.toDataURL();
+  sendMessage({type: 'screenshot', dataURL});
 }
 
 function sendMessage(message) {
