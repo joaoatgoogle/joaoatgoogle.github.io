@@ -46,14 +46,16 @@ function onRestart() {
   emptyPositions = 9;
   winPosition = undefined;
   requestDraw(draw);
+  sendMessage({type: 'clearChat'});
 }
 
 function onPlayGemini() {
+  sendMessage({type: 'clearChat'});
   if (gameState !== X_TURN && gameState !== O_TURN) {
     return;
   }
   const next = gameState === X_TURN ? 'X' : 'O';
-  const userText = `Play the next turn as ${next}`;
+  const userText = `Analyze the game of Tic Tac Toe carefully. Play the next turn as ${next}.`;
   const imageDataURL = canvasElement.toDataURL();
   sendMessage({type: 'sendToModel', userText, imageDataURL});
 }
@@ -274,7 +276,7 @@ function sendInit() {
   sendMessage({
     type: 'init',
     supportsScreenshot: true,
-    systemInstructions: 'You are a passionate gamer and love puzzles. Give playful answers. When playing a game, analyze it carefully and make the best plays to win.',
+    systemInstructions: 'You are a passionate gamer and love puzzles. Give playful answers and use emojis. When playing a game, analyze it carefully and make the best plays to win.',
     functionDeclarations: [
       {
         'name': 'play',
@@ -311,7 +313,9 @@ function sendScreenshot() {
 }
 
 function sendMessage(message) {
-  window.parent.postMessage(message, aistudioOrigin);
+  if (aistudioOrigin) {
+    window.parent.postMessage(message, aistudioOrigin);
+  }
 }
 
 function handlePlay(row, column) {
