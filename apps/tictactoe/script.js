@@ -352,6 +352,11 @@ function onMessage(event) {
       handleFunctionCall(data.name, data.args);
       break;
 
+    default:
+      console.log('Received unknown message from AI Studio:', data.type);
+      console.dir(data);
+      break;
+
   }
 }
 
