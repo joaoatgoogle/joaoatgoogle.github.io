@@ -1,3 +1,5 @@
+import * as aistudio from './aistudio.js';
+
 const canvasContainerElement = document.getElementById('canvasContainer');
 const canvasElement = document.getElementById('canvas');
 const canvas = canvasElement.getContext('2d');
@@ -46,11 +48,11 @@ function onRestart() {
   emptyPositions = 9;
   winPosition = undefined;
   requestDraw(draw);
-  sendMessage({type: 'clearChat'});
+  aistudio.clearChat();
 }
 
 function onPlayGemini() {
-  sendMessage({type: 'clearChat'});
+  aistudio.clearChat();
   if (gameState !== X_TURN && gameState !== O_TURN) {
     return;
   }
@@ -360,18 +362,33 @@ function onMessage(event) {
   }
 }
 
-function init() {
+function screenshotCallback() {
+  console.log('-- screenshotCallback');
+  return canvasElement.toDataURL();
+}
+
+async function init() {
   window.addEventListener('resize', onResize);
   canvasElement.addEventListener('click', onClick);
-  window.addEventListener('message', onMessage);
+  // window.addEventListener('message', onMessage);
 
   document.getElementById('play').addEventListener('click', onPlayGemini);
   document.getElementById('autoplay').addEventListener('click', onAutoplay);
   document.getElementById('restart').addEventListener('click', onRestart);
 
-  onRestart();
   onResize();
   requestAnimationFrame(onResize);
+
+  await aistudio.init({
+    screenshotCallback,
+    systemInstructions: 'foo',
+  });
+
+  onRestart();
+  aistudio.chat('Welcome to Tic Tac Toe!');
+
+  // For debugging and quick iteration:
+  window.aistudio = aistudio;
 }
 
 init();
