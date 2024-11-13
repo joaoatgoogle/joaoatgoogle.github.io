@@ -38,8 +38,6 @@ const WIN_POSITIONS = [
 
 let winPosition = undefined;
 
-let aistudioOrigin = '';
-
 let autoplay = false;
 
 function onRestart() {
@@ -49,22 +47,23 @@ function onRestart() {
   winPosition = undefined;
   requestDraw(draw);
   aistudio.clearChat();
+  aistudio.chat('Welcome to Tic Tac Toe!');
 }
 
 function onPlayGemini() {
-  aistudio.clearChat();
   if (gameState !== X_TURN && gameState !== O_TURN) {
     return;
   }
+  aistudio.clearChat();
   const next = gameState === X_TURN ? 'X' : 'O';
   const userText = `Analyze the game of Tic Tac Toe carefully. Play the next turn as ${next}.`;
   const imageDataURL = canvasElement.toDataURL();
-  sendMessage({type: 'sendToModel', userText, imageDataURL});
+  aistudio.generateContent({userText, imageDataURL});
 }
 
 function onAutoplay() {
   autoplay = !autoplay;
-  sendText(`Autoplay is now ${autoplay ? 'enabled' : 'disabled'}.`);
+  aistudio.chat(`Autoplay is now ${autoplay ? 'enabled' : 'disabled'}.`);
 }
 
 function isWinPosition([[r1, c1], [r2, c2], [r3, c3]], player) {
@@ -223,21 +222,21 @@ function play(row, column) {
     winPosition = getWinPosition('x');
     gameState = winPosition ? OVER : O_TURN;
     if (winPosition) {
-      sendText('X wins!');
+      aistudio.chat('X wins!');
     }
   } else {
     gridState[index] = 'o';
     winPosition = getWinPosition('o');
     gameState = winPosition ? OVER : X_TURN;
     if (winPosition) {
-      sendText('O wins!');
+      aistudio.chat('O wins!');
     }
   }
 
   emptyPositions--;
   if (emptyPositions === 0 && gameState !== OVER) {
     gameState == OVER;
-    sendText(`It's a draw!`);
+    aistudio.chat(`It's a draw!`);
   }
 
   requestDraw();
@@ -259,10 +258,10 @@ function onClick(event) {
       const [cx, cy, size] = gridCoordinates[index];
       if (x >= cx && x <= cx + size && y >= cy && y <= cy + size) {
         // Clicking inside this grid position.
-        play(row, column);
+        const isValid = play(row, column);
 
         // Make an autoplay if enabled and there are positions left.
-        if (autoplay && (gameState === X_TURN || gameState == O_TURN)) {
+        if (isValid && autoplay && (gameState === X_TURN || gameState == O_TURN)) {
           // Wait for requestAnimationFrame() so that the screenshot includes
           // changes from the play() above.
           requestAnimationFrame(onPlayGemini);
@@ -274,103 +273,47 @@ function onClick(event) {
   }
 }
 
-function sendInit() {
-  sendMessage({
-    type: 'init',
-    supportsScreenshot: true,
-    systemInstructions: 'You are a passionate gamer and love puzzles. Give playful answers and use emojis. When playing a game, analyze it carefully and make the best plays to win.',
-    functionDeclarations: [
-      {
-        'name': 'play',
-        'description': 'Places the next X or O in a game of Tic Tac Toe. The first to play is always X. The cells are identified by row and column numbers, from 1 to 3.',
-        'parameters': {
-          'type': 'object',
-          'properties': {
-            'row': {
-              'type': 'integer',
-              'description': 'The row of the cell to make a move on. Valid values: 1, 2 or 3',
-              'minimum': 1,
-              'maximum': 3,
-            },
-            'column': {
-              'type': 'integer',
-              'description': 'The column of the cell to make a move on. Valid values: 1, 2 or 3',
-              'minimum': 1,
-              'maximum': 3,
-            },
-          },
-        },
-      },
-    ],
-  });
-}
-
-function sendText(text) {
-  sendMessage({type: 'chat', text});
-}
-
-function sendScreenshot() {
-  const dataURL = canvasElement.toDataURL();
-  sendMessage({type: 'screenshot', dataURL});
-}
-
-function sendMessage(message) {
-  if (aistudioOrigin) {
-    window.parent.postMessage(message, aistudioOrigin);
-  }
-}
-
-function handlePlay(row, column) {
+function playCallback({row, column}) {
   const valid = play(row - 1, column - 1);
   if (!valid) {
-    sendText('Invalid move!');
-  }
-}
-
-function handleFunctionCall(name, args) {
-  switch (name) {
-    case 'play':
-      handlePlay(args.row, args.column);
-      break;
-  }
-}
-
-function onMessage(event) {
-  const data = event.data;
-
-  switch (data.type) {
-
-    case 'init':
-      aistudioOrigin = event.origin;
-      sendInit();
-      sendText('Welcome to Tic Tac Toe!');
-      break;
-
-    case 'screenshot':
-      sendScreenshot();
-      break;
-
-    case 'functionCall':
-      handleFunctionCall(data.name, data.args);
-      break;
-
-    default:
-      console.log('Received unknown message from AI Studio:', data.type);
-      console.dir(data);
-      break;
-
+    aistudio.chat('Invalid move!');
   }
 }
 
 function screenshotCallback() {
-  console.log('-- screenshotCallback');
   return canvasElement.toDataURL();
 }
+
+const SYSTEM_INSTRUCTIONS = 'You are a passionate gamer and love puzzles. Give playful answers and use emojis. When playing a game, analyze it carefully and make the best plays to win.';
+
+const FUNCTION_DECLARATIONS = [
+  {
+    'name': 'play',
+    'description': 'Places the next X or O in a game of Tic Tac Toe. The first to play is always X. The cells are identified by row and column numbers, from 1 to 3.',
+    'parameters': {
+      'type': 'object',
+      'properties': {
+        'row': {
+          'type': 'integer',
+          'description': 'The row of the cell to make a move on. Valid values: 1, 2 or 3',
+          'minimum': 1,
+          'maximum': 3,
+        },
+        'column': {
+          'type': 'integer',
+          'description': 'The column of the cell to make a move on. Valid values: 1, 2 or 3',
+          'minimum': 1,
+          'maximum': 3,
+        },
+      },
+    },
+    'callback': playCallback,
+  },
+];
 
 async function init() {
   window.addEventListener('resize', onResize);
   canvasElement.addEventListener('click', onClick);
-  // window.addEventListener('message', onMessage);
 
   document.getElementById('play').addEventListener('click', onPlayGemini);
   document.getElementById('autoplay').addEventListener('click', onAutoplay);
@@ -381,13 +324,13 @@ async function init() {
 
   await aistudio.init({
     screenshotCallback,
-    systemInstructions: 'foo',
+    systemInstructions: SYSTEM_INSTRUCTIONS,
+    functionDeclarations: FUNCTION_DECLARATIONS,
   });
 
   onRestart();
-  aistudio.chat('Welcome to Tic Tac Toe!');
 
-  // For debugging and quick iteration:
+  // For debugging and iterative development:
   window.aistudio = aistudio;
 }
 

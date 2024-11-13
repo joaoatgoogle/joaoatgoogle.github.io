@@ -15,8 +15,13 @@ export async function init({
   // A list of function declarations that the model can invoke on this app.
   // generateContent() will include all of these by default, unless a subset
   // is specified in each generateContent() call. Each function declaration
-  // is an object with a string "name", a string "description", and a JSON
-  // Schema list of "parameters" to that function.
+  // is an object with these properties:
+  //
+  //   "name": the name of the function as a string
+  //   "description: a string describing what the function does
+  //   "parameters": a JSON schema listing the parameters to the function
+  //   "callback": a function to be invoked when a model response invokes
+  //               this function.
   functionDeclarations = [],
 
   // The initial system instructions, as a string.
@@ -26,6 +31,11 @@ export async function init({
   takeScreenshotCallback = screenshotCallback;
 
   const supportsScreenshot = screenshotCallback !== undefined;
+
+  for (const f of functionDeclarations) {
+    functionDeclarationsMap.set(f.name, f.callback);
+    delete f.callback;
+  }
 
   initData = {
     type: 'init',
@@ -74,8 +84,58 @@ export function setSystemInstructions(systemInstructions) {
 //
 // The Promise resolves to a string with the model's response.
 export async function generateContent({
-}) {
-  // TODO: here
+
+  // The model to call. The model specified in init() will be used by default.
+  model = undefined,
+
+  // Whether to request model responses in JSON.
+  // NOTE: Function Declarations are *always* disabled when JSON mode is enabled.
+  jsonMode = false,
+
+  // If jsonMode is true then this can be used to specify the JSON schema.
+  jsonSchema = undefined,
+
+  // The text string to send to the model, as as "user" turn. This is required.
+  userText = undefined,
+
+  // An optional "data:" URL with an image payload, to include with the user
+  // turn.
+  imageDataURL = undefined,
+
+  // The list of Function Declarations that should be enabled in this call,
+  // specified as a list of strings. Each string identifies one of the Function
+  // Declarations passed to init().
+  //
+  // "undefined" sends ALL Function Declarations passed to init().
+  // An empty list can be passed to disable all Function Declarations.
+  enabledFunctions = undefined,
+
+} = {}) {
+  if (generateContentResolve) {
+    throw new Error("Previous call to generateContent hasn't finished yet");
+  }
+
+  if (typeof userText !== 'string') {
+    throw new Error('userText must be a string');
+  }
+
+  return new Promise((resolve) => {
+    generateContentResolve = resolve;
+
+    generateContentPendingRequestId = `${generateContentNextRequestId++}`;
+
+    const message = {
+      type: 'sendToModel',
+      requestId: generateContentPendingRequestId,
+      jsonMode,
+      jsonSchema,
+      userText,
+      imageDataURL,
+      enabledFunctions,
+    };
+
+    sendMessage(message);
+  });
 }
 
 
@@ -92,6 +152,12 @@ let initResolve = null;
 
 let takeScreenshotCallback = null;
 
+let generateContentPendingRequestId = '';
+let generateContentNextRequestId = 0;
+let generateContentResolve = null;
+
+const functionDeclarationsMap = new Map();
+
 function sendMessage(message) {
   if (aistudioOrigin) {
     window.parent.postMessage(message, aistudioOrigin);
@@ -100,10 +166,32 @@ function sendMessage(message) {
   }
 }
 
+function onModelResponse(requestId, text) {
+  if (requestId !== generateContentPendingRequestId) {
+    console.error(`Unexpected message from AI Studio for requestId ${requestId}`);
+    return;
+  }
+  if (!generateContentResolve) {
+    console.error('Unexpected model response from AI Studio');
+    return;
+  }
+  generateContentPendingRequestId = '';
+  const resolve = generateContentResolve;
+  generateContentResolve = null;
+  resolve(text);
+}
+
+function onFunctionCall(name, args) {
+  const callback = functionDeclarationsMap.get(name);
+  if (callback) {
+    callback(args);
+  } else {
+    console.error(`Invalid model Function Call to unknown function "${name}"`);
+  }
+}
+
 async function onMessage(event) {
   const data = event.data;
-
-  console.log('-- Received message from AI Studio:', data.type);
 
   switch (data.type) {
 
@@ -125,12 +213,16 @@ async function onMessage(event) {
       break;
 
     case 'functionCall':
-      // handleFunctionCall(data.name, data.args);
+      onFunctionCall(data.name, data.args);
+      break;
+
+    case 'modelResponse':
+      onModelResponse(data.requestId, data.text);
       break;
 
     default:
-      // console.log('Received unknown message from AI Studio:', data.type);
-      // console.dir(data);
+      console.log('Received unknown message from AI Studio:', data.type);
+      console.dir(data);
       break;
 
   }
